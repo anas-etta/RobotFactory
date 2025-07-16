@@ -1,0 +1,21 @@
+﻿{
+  "manifest_version": 3,
+  "name": "RobotFactory",
+  "version": "1.1",
+  "description": "Records UI actions and exports rech.json format.",
+  "permissions": [
+    "scripting",
+    "downloads",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "RobotFactory"
+  }
+}

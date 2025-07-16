@@ -1,0 +1,33 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>RobotFactory Recorder</title>
+  <style>
+    body { font-family: Arial, sans-serif; width: 340px; margin: 0; padding: 16px; }
+    h1 { font-size: 1.2em; margin-bottom: 12px; }
+    .status { margin-bottom: 12px; }
+    button { margin: 5px 0; width: 100%; padding: 8px; font-size: 1em; }
+    .actions { margin-top: 12px; }
+    .steps { margin: 12px 0; max-height: 220px; overflow-y: auto; background: #f7f7f7; border: 1px solid #eee; padding: 8px; font-size: 0.97em; }
+    .step-row { margin-bottom: 4px; }
+    .step-cmd { font-weight: bold; }
+    .small { font-size: 0.9em; color: #666; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>RobotFactory Recorder</h1>
+  <div class="status" id="status"></div>
+  <button id="toggleRecording">Start Recording</button>
+  <div class="actions">
+    <button id="downloadJson">Download rech.json</button>
+    <button id="clearActions">Clear Actions</button>
+  </div>
+  <div class="steps" id="steps"></div>
+  <div class="small">
+    Actions are recorded in the tab you started recording.<br>
+    You can close this popup and keep recording.
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
