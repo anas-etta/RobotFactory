@@ -6,12 +6,29 @@ function getStepsForTab(tabId) {
   return recordedActions[tabId] || [];
 }
 
-// Helper to get the current URL of a tab (returns a Promise)
+// Helper: get the URL of a tab (returns a Promise)
 function getTabUrl(tabId) {
   return new Promise((resolve) => {
     chrome.tabs.get(tabId, (tab) => resolve(tab?.url || ""));
   });
 }
+
+// Auto-inject content script after navigation if recording is active
+chrome.webNavigation.onCompleted.addListener(
+  function (details) {
+    if (
+      details.tabId === recordingTabId &&
+      isRecording &&
+      details.frameId === 0 // main frame only
+    ) {
+      chrome.scripting.executeScript({
+        target: { tabId: details.tabId },
+        files: ["content-script.js"],
+      });
+    }
+  },
+  { url: [{ schemes: ["http", "https"] }] }
+);
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "start_recording") {
@@ -38,12 +55,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "recorded_action" && sender.tab) {
     if (isRecording && sender.tab.id === recordingTabId) {
       if (!recordedActions[recordingTabId]) recordedActions[recordingTabId] = [];
-      recordedActions[recordingTabId].push(message.action);
-      chrome.runtime.sendMessage({
-        type: "actions_updated",
-        tabId: recordingTabId,
-        actions: recordedActions[recordingTabId]
-      });
+      // Exclude any action with cmd "open" (shouldn't happen if content-script.js is correct)
+      if (message.action.cmd !== "open") {
+        recordedActions[recordingTabId].push(message.action);
+        chrome.runtime.sendMessage({
+          type: "actions_updated",
+          tabId: recordingTabId,
+          actions: recordedActions[recordingTabId],
+        });
+      }
     }
     sendResponse({ success: true });
     return;
@@ -65,9 +85,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           openCmd,
           ...actions.map(a => ({
             Command: a.cmd === "input" ? "type" : a.cmd,
-            Target: a.elementInfo?.id
-              ? `id=${a.elementInfo.id}`
-              : (a.elementInfo?.xpath ? `xpath=${a.elementInfo.xpath}` : (a.elementInfo?.cssSelector || "")),
+            Target: a.elementInfo?.xpath ? `xpath=${a.elementInfo.xpath}` : "",
             Value: a.value || "",
             Targets: [],
             Description: ""
@@ -84,7 +102,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       sendResponse({ success: true });
     });
-    return true; // Keep message port open for async response
+    return true; // Keep the message channel open for async response
   }
   if (message.type === "clear_actions") {
     const tabId = message.tabId;
