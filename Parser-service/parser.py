@@ -74,10 +74,14 @@ def generate_selenium_python(commands):
         elif c == "clickandwait":
             code.append(f'driver.find_element(By.{by.upper()}, "{escape_quotes(locator)}").click()')
             code.append('time.sleep(2)  # Wait after clicking and waiting')
-        elif c == "type":
-            code.append(f'driver.find_element(By.{by.upper()}, "{escape_quotes(locator)}").clear()')
-            code.append(f'driver.find_element(By.{by.upper()}, "{escape_quotes(locator)}").send_keys("{escape_quotes(value)}")')
-            code.append('time.sleep(0.5)  # Slow down after typing')
+        elif c in ("type", "input"):
+            if value:
+                code.append(f'driver.find_element(By.{by.upper()}, "{escape_quotes(locator)}").clear()')
+                code.append(f'driver.find_element(By.{by.upper()}, "{escape_quotes(locator)}").send_keys("{escape_quotes(value)}")')
+                code.append('time.sleep(0.5)  # Slow down after typing')
+            else:
+                code.append(f'driver.find_element(By.{by.upper()}, "{escape_quotes(locator)}").click()')
+                code.append('time.sleep(1)  # Click when type/input has no value')
         elif c == "select":
             code.append(f'Select(driver.find_element(By.{by.upper()}, "{escape_quotes(locator)}")).select_by_visible_text("{escape_quotes(value)}")')
             code.append('time.sleep(0.5)  # Slow down after selecting')

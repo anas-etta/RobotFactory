@@ -5,38 +5,40 @@ if (!window.__rf_click_listener_added) {
   window.__rf_click_listener_added = true;
 
   function getElementInfo(element) {
-    return {
-      xpath: getElementXPath(element)
-    };
+    // Prefer unique id, else absolute XPath
+    let info = {};
+    if (
+      element.id &&
+      document.querySelectorAll(`#${CSS.escape(element.id)}`).length === 1
+    ) {
+      info.id = element.id;
+    } else {
+      info.absXPath = getAbsoluteXPath(element);
+    }
+    return info;
   }
 
-  function getElementXPath(element) {
+  function getAbsoluteXPath(element) {
     if (!element) return "";
-    if (element.id) return `//*[@id="${element.id}"]`;
-
-    // Try using unique attributes for input/button elements
-    if (element.tagName === "INPUT" && element.getAttribute("placeholder")) {
-      return `//input[@placeholder="${element.getAttribute("placeholder")}"]`;
-    }
-    if (
-      (element.tagName === "BUTTON" || element.tagName === "A") &&
-      element.textContent.trim() !== ""
+    const paths = [];
+    for (
+      ;
+      element && element.nodeType === Node.ELEMENT_NODE;
+      element = element.parentNode
     ) {
-      return `//${element.tagName.toLowerCase()}[normalize-space(text())="${element.textContent.trim()}"]`;
-    }
-
-    // Fallback to index-based XPath
-    const parts = [];
-    while (element && element.nodeType === Node.ELEMENT_NODE) {
-      let index = 1, sibling = element.previousSibling;
+      let index = 1;
+      let sibling = element.previousSibling;
       while (sibling) {
-        if (sibling.nodeType === Node.ELEMENT_NODE && sibling.nodeName === element.nodeName) index++;
+        if (
+          sibling.nodeType === Node.ELEMENT_NODE &&
+          sibling.nodeName === element.nodeName
+        )
+          index++;
         sibling = sibling.previousSibling;
       }
-      parts.unshift(element.nodeName.toLowerCase() + `[${index}]`);
-      element = element.parentNode;
+      paths.unshift(element.nodeName.toLowerCase() + `[${index}]`);
     }
-    return "/" + parts.join("/");
+    return "/" + paths.join("/");
   }
 
   // Robust sendAction that ignores extension context errors
@@ -77,11 +79,10 @@ if (!window.__rf_click_listener_added) {
           target.tagName === "TEXTAREA" ||
           target.getAttribute("contenteditable") === "true")
       ) {
-        let xpath = getElementXPath(target);
         sendAction({
           cmd: "input",
           value: target.value,
-          elementInfo: { xpath: xpath },
+          elementInfo: getElementInfo(target),
           url: window.location.href,
           timestamp: new Date().toISOString()
         });

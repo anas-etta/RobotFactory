@@ -54,8 +54,11 @@ def convert_to_robot_script(commands: list) -> str:
         elif command == "clickandwait":
             robot_lines.append(f"    Click Element    {target}")
             robot_lines.append("    Sleep    2s")
-        elif command == "type":
-            robot_lines.append(f"    Input Text    {target}    {value}")
+        elif command in ("type", "input"):
+            if value:
+                robot_lines.append(f"    Input Text    {target}    {value}")
+            else:
+                robot_lines.append(f"    Click Element    {target}")
         elif command == "select":
             robot_lines.append(f"    Select From List By Label    {target}    {value}")
         elif command == "pause":

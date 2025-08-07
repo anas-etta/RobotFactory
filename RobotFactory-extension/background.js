@@ -13,6 +13,13 @@ function getTabUrl(tabId) {
   });
 }
 
+// Returns "id=..." if id exists, else "xpath=..." for absXPath
+function getBestSelector(elementInfo) {
+  if (elementInfo.id) return `id=${elementInfo.id}`;
+  if (elementInfo.absXPath) return `xpath=${elementInfo.absXPath}`;
+  return "";
+}
+
 // Auto-inject content script after navigation if recording is active
 chrome.webNavigation.onCompleted.addListener(
   function (details) {
@@ -85,7 +92,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           openCmd,
           ...actions.map(a => ({
             Command: a.cmd === "input" ? "type" : a.cmd,
-            Target: a.elementInfo?.xpath ? `xpath=${a.elementInfo.xpath}` : "",
+            Target: a.elementInfo ? getBestSelector(a.elementInfo) : "",
             Value: a.value || "",
             Targets: [],
             Description: ""
