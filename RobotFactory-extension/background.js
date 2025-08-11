@@ -1,6 +1,7 @@
 ﻿const recordedActions = {};
 let isRecording = false;
 let recordingTabId = null;
+let recordingStartUrl = null; // <-- Track the starting URL
 
 function getStepsForTab(tabId) {
   return recordedActions[tabId] || [];
@@ -41,6 +42,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "start_recording") {
     isRecording = true;
     recordingTabId = message.tabId;
+
+    // Set the starting URL for this recording session
+    if (sender.tab && sender.tab.url) {
+      recordingStartUrl = sender.tab.url;
+    } else if (message.tabUrl) {
+      recordingStartUrl = message.tabUrl;
+    } else {
+      // fallback to try to get it via chrome.tabs.get
+      chrome.tabs.get(recordingTabId, (tab) => {
+        recordingStartUrl = tab?.url || "";
+      });
+    }
+
     if (!recordedActions[recordingTabId]) recordedActions[recordingTabId] = [];
     sendResponse({ success: true });
     return;
@@ -48,6 +62,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "stop_recording") {
     isRecording = false;
     recordingTabId = null;
+    // Leave recordingStartUrl as is, so download_json uses it.
     sendResponse({ success: true });
     return;
   }
@@ -78,38 +93,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "download_json") {
     let tabId = message.tabId || recordingTabId;
     let actions = recordedActions[tabId] || [];
-    getTabUrl(tabId).then((tabUrl) => {
-      const openCmd = {
-        Command: "open",
-        Target: tabUrl,
-        Value: "",
-        Description: ""
-      };
-      const rechJson = {
-        Name: "rech",
-        CreationDate: new Date().toISOString().split("T")[0],
-        Commands: [
-          openCmd,
-          ...actions.map(a => ({
-            Command: a.cmd === "input" ? "type" : a.cmd,
-            Target: a.elementInfo ? getBestSelector(a.elementInfo) : "",
-            Value: a.value || "",
-            Targets: [],
-            Description: ""
-          }))
-        ]
-      };
-      const json = JSON.stringify(rechJson, null, 2);
-      const base64 = btoa(unescape(encodeURIComponent(json)));
-      const url = "data:application/json;base64," + base64;
-      chrome.downloads.download({
-        url: url,
-        filename: "rech.json",
-        saveAs: true
+    // Always use the url where recording started
+    let urlToUse = recordingStartUrl;
+    if (!urlToUse) {
+      // fallback to current tab URL if for some reason it's missing
+      getTabUrl(tabId).then((tabUrl) => {
+        urlToUse = tabUrl;
+        exportJson(urlToUse, actions, sendResponse);
       });
-      sendResponse({ success: true });
-    });
-    return true; // Keep the message channel open for async response
+      return true;
+    } else {
+      exportJson(urlToUse, actions, sendResponse);
+      return true;
+    }
   }
   if (message.type === "clear_actions") {
     const tabId = message.tabId;
@@ -123,3 +119,36 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return;
   }
 });
+
+// Helper to export rechJson
+function exportJson(urlToUse, actions, sendResponse) {
+  const openCmd = {
+    Command: "open",
+    Target: urlToUse,
+    Value: "",
+    Description: ""
+  };
+  const rechJson = {
+    Name: "rech",
+    CreationDate: new Date().toISOString().split("T")[0],
+    Commands: [
+      openCmd,
+      ...actions.map(a => ({
+        Command: a.cmd === "input" ? "type" : a.cmd,
+        Target: a.elementInfo ? getBestSelector(a.elementInfo) : "",
+        Value: a.value || "",
+        Targets: [],
+        Description: ""
+      }))
+    ]
+  };
+  const json = JSON.stringify(rechJson, null, 2);
+  const base64 = btoa(unescape(encodeURIComponent(json)));
+  const url = "data:application/json;base64," + base64;
+  chrome.downloads.download({
+    url: url,
+    filename: "rech.json",
+    saveAs: true
+  });
+  sendResponse({ success: true });
+}
