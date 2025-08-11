@@ -23,17 +23,40 @@ function renderSteps(actions) {
     stepsEl.innerHTML = "<span style='color:#888'>No actions recorded yet.</span>";
     return;
   }
-  stepsEl.innerHTML = actions.map((a, i) => {
-    let label = `<span class="step-cmd">${a.cmd}</span>`;
-    if (a.cmd === "click") {
-      label += ` on <code>${a.elementInfo?.xpath || a.elementInfo?.cssSelector || a.elementInfo?.tagName || "?"}</code>`;
-    } else if (a.cmd === "input") {
-      label += ` on <code>${a.elementInfo?.xpath || a.elementInfo?.cssSelector || a.elementInfo?.tagName || "?"}</code> = <code>${a.value ?? ""}</code>`;
-    } else if (a.cmd === "navigate" || a.cmd === "open") {
-      label += ` to <code>${a.url}</code>`;
+
+  chrome.runtime.sendMessage({ type: "get_recording_state" }, (resp) => {
+    let startUrl = null;
+    if (resp && resp.recordingStartUrl) {
+      startUrl = resp.recordingStartUrl;
+    } else if (actions[0]?.url) {
+      startUrl = actions[0].url;
     }
-    return `<div class="step-row">${i + 1}. ${label}</div>`;
-  }).join("");
+    let html = "";
+    let idx = 1;
+
+    if (startUrl) {
+      html += `<div class="step-row">${idx++}. <span class="step-cmd">open</span> to <code>${startUrl}</code></div>`;
+    }
+
+    html += actions.map((a, i) => {
+      let label = `<span class="step-cmd">${a.cmd}</span>`;
+      if (a.cmd === "click") {
+        let selector = "?";
+        if (a.elementInfo?.id) selector = `id=${a.elementInfo.id}`;
+        else if (a.elementInfo?.absXPath) selector = `xpath=${a.elementInfo.absXPath}`;
+        label += ` on <code>${selector}</code>`;
+      } else if (a.cmd === "input") {
+        let selector = "?";
+        if (a.elementInfo?.id) selector = `id=${a.elementInfo.id}`;
+        else if (a.elementInfo?.absXPath) selector = `xpath=${a.elementInfo.absXPath}`;
+        label += ` on <code>${selector}</code> = <code>${a.value ?? ""}</code>`;
+      } else if (a.cmd === "navigate") {
+        label += ` to <code>${a.url}</code>`;
+      }
+      return `<div class="step-row">${idx++}. ${label}</div>`;
+    }).join("");
+    stepsEl.innerHTML = html;
+  });
 }
 
 function refreshSteps() {
@@ -94,11 +117,14 @@ document.addEventListener("DOMContentLoaded", () => {
               files: ["content-script.js"]
             },
             () => {
-              chrome.runtime.sendMessage({ type: "start_recording", tabId: currentTabId }, () => {
-                isRecording = true;
-                refreshSteps();
-                updateUI(true);
-              });
+              chrome.runtime.sendMessage(
+                { type: "start_recording", tabId: currentTabId, tabUrl: tab.url }, // add tabUrl!
+                () => {
+                  isRecording = true;
+                  refreshSteps();
+                  updateUI(true);
+                }
+              );
             }
           );
         } else {
